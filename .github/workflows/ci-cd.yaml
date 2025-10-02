@@ -1,4 +1,4 @@
-name: CI (test) + Build & Push to GHCR
+name: CI (test) + Build & Push to GHCR + Local Deploy
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           pip install -r requirements.txt
           pip install pytest httpx
 
-      - name: Train model (bakes model.joblib for tests and image parity)
+      - name: Train model (bakes model.joblib)
         run: python train.py
 
       - name: Run unit tests
@@ -43,3 +43,35 @@ jobs:
           docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
           docker push $IMAGE:${{ github.sha }}
           docker push $IMAGE:latest
+
+  deploy-local:
+    # This runs on YOUR Windows self-hosted runner so it can reach Docker Desktop's K8s
+    runs-on: self-hosted
+    needs: build-test-publish
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Docker Desktop context
+        shell: pwsh
+        run: |
+          kubectl config use-context docker-desktop
+          kubectl get nodes
+
+      - name: Apply manifest (ensures resources exist)
+        shell: pwsh
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+
+      - name: Roll out exact image built for this commit
+        shell: pwsh
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+        run: |
+          kubectl set image deployment/iris-api api="$env:IMAGE" --record
+          kubectl rollout status deployment/iris-api --timeout=180s
+
+      - name: Show running image (debug)
+        shell: pwsh
+        run: |
+          kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"; echo
