@@ -1,0 +1,11 @@
+How CI/CD + Kubernetes fit into an ML project (super simple)
+
+Idea:
+
+CI (Continuous Integration) checks your code + model artifacts on every push: style, tests, small sanity checks.
+
+CD (Continuous Delivery/Deployment) packages your app (with the model) into a Docker image and deploys it automatically.
+
+Kubernetes runs that Docker image reliably (multiple replicas, auto-restart, rolling updates), so your model is always available.
+
+Think of it as: commit → tests → build image → push image → deploy to K8s → live API.
