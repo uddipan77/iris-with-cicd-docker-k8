@@ -52,22 +52,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check kubectl
+      - name: Print env & PATH
         shell: powershell
         run: |
-          kubectl version --client
-          kubectl config get-contexts
+          Write-Host "Runner OS: $env:RUNNER_OS"
+          Write-Host "UserProfile: $env:USERPROFILE"
+          Write-Host "HOME: $env:HOME"
+          Write-Host "KUBECONFIG: $env:KUBECONFIG"
+          ($env:Path -split ';') | ForEach-Object { Write-Host $_ }
 
-      - name: Use Docker Desktop context
+      - name: Tool versions
         shell: powershell
         run: |
+          where.exe kubectl
+          where.exe docker
+          kubectl version --client
+          docker --version
+
+      - name: Show kube contexts & use docker-desktop
+        shell: powershell
+        run: |
+          kubectl config get-contexts
           kubectl config use-context docker-desktop
-          kubectl get nodes
+          kubectl cluster-info
+
+      - name: Check cluster connectivity
+        shell: powershell
+        run: |
+          kubectl get nodes -o wide
+          kubectl get ns
+          kubectl get svc -A
+
+      - name: Verify manifest exists in workspace
+        shell: powershell
+        run: |
+          pwd
+          ls
+          ls k8s
+          Get-Content k8s/deployment.yaml | Select-Object -First 20
 
       - name: Apply manifest (ensures resources exist)
         shell: powershell
         run: |
-          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml --v=6
 
       - name: Roll out exact image built for this commit
         shell: powershell
@@ -76,10 +103,11 @@ jobs:
         run: |
           Write-Host "Rolling out $env:IMAGE"
           kubectl set image deployment/iris-api api=$env:IMAGE --record
-          kubectl rollout status deployment/iris-api --timeout=180s
+          kubectl rollout status deployment/iris-api --timeout=300s
 
       - name: Show running image (debug)
         shell: powershell
         run: |
           kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"
           echo ""
+          kubectl get pods -l app=iris-api -o wide
