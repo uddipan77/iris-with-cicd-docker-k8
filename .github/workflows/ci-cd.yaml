@@ -48,18 +48,10 @@ jobs:
     # Runs on YOUR Windows self-hosted runner
     runs-on: self-hosted
     needs: build-test-publish
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Print env & PATH
-        shell: powershell
-        run: |
-          Write-Host "Runner OS: $env:RUNNER_OS"
-          Write-Host "UserProfile: $env:USERPROFILE"
-          Write-Host "HOME: $env:HOME"
-          Write-Host "KUBECONFIG: $env:KUBECONFIG"
-          ($env:Path -split ';') | ForEach-Object { Write-Host $_ }
 
       - name: Tool versions
         shell: powershell
@@ -69,32 +61,27 @@ jobs:
           kubectl version --client
           docker --version
 
-      - name: Show kube contexts & use docker-desktop
+      - name: Use Docker Desktop context
         shell: powershell
         run: |
-          kubectl config get-contexts
           kubectl config use-context docker-desktop
-          kubectl cluster-info
-
-      - name: Check cluster connectivity
-        shell: powershell
-        run: |
           kubectl get nodes -o wide
-          kubectl get ns
-          kubectl get svc -A
 
-      - name: Verify manifest exists in workspace
+      - name: Show k8s manifests in repo
         shell: powershell
         run: |
-          pwd
-          ls
-          ls k8s
+          Get-ChildItem k8s
+          Write-Host "---- deployment.yaml (first 20 lines) ----"
           Get-Content k8s/deployment.yaml | Select-Object -First 20
+          if (Test-Path k8s/service.nodeport.yaml) {
+            Write-Host "---- service.nodeport.yaml (first 20 lines) ----"
+            Get-Content k8s/service.nodeport.yaml | Select-Object -First 20
+          }
 
-      - name: Apply manifest (ensures resources exist)
+      - name: Apply manifests (everything under k8s/)
         shell: powershell
         run: |
-          kubectl apply -f k8s/deployment.yaml --v=6
+          kubectl apply -f k8s --recursive --v=4
 
       - name: Roll out exact image built for this commit
         shell: powershell
@@ -104,10 +91,5 @@ jobs:
           Write-Host "Rolling out $env:IMAGE"
           kubectl set image deployment/iris-api api=$env:IMAGE --record
           kubectl rollout status deployment/iris-api --timeout=300s
-
-      - name: Show running image (debug)
-        shell: powershell
-        run: |
-          kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"
-          echo ""
+          kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"; echo
           kubectl get pods -l app=iris-api -o wide
