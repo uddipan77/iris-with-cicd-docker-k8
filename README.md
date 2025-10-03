@@ -299,7 +299,7 @@ kubectl rollout undo deployment/iris-api
 
 ## 📄 License
 
-MIT
+Apache-2.0 license
 
 ---
 
