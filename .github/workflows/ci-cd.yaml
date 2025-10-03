@@ -88,8 +88,11 @@ jobs:
         env:
           IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
         run: |
+          $ErrorActionPreference = 'Stop'
           Write-Host "Rolling out $env:IMAGE"
-          kubectl set image deployment/iris-api api=$env:IMAGE --record
+          # --record is deprecated; removing it
+          kubectl set image deployment/iris-api api=$env:IMAGE
           kubectl rollout status deployment/iris-api --timeout=300s
-          kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"; echo
+          $img = kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"
+          Write-Host $img
           kubectl get pods -l app=iris-api -o wide
