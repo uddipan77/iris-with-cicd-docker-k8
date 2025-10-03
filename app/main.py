@@ -13,7 +13,7 @@ class IrisInput(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok v2"}
 
 @app.post("/predict")
 def predict(inp: IrisInput):
