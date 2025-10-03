@@ -45,33 +45,41 @@ jobs:
           docker push $IMAGE:latest
 
   deploy-local:
-    # This runs on YOUR Windows self-hosted runner so it can reach Docker Desktop's K8s
+    # Runs on YOUR Windows self-hosted runner
     runs-on: self-hosted
     needs: build-test-publish
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check kubectl
+        shell: powershell
+        run: |
+          kubectl version --client
+          kubectl config get-contexts
+
       - name: Use Docker Desktop context
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl config use-context docker-desktop
           kubectl get nodes
 
       - name: Apply manifest (ensures resources exist)
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl apply -f k8s/deployment.yaml
 
       - name: Roll out exact image built for this commit
-        shell: pwsh
+        shell: powershell
         env:
           IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
         run: |
-          kubectl set image deployment/iris-api api="$env:IMAGE" --record
+          Write-Host "Rolling out $env:IMAGE"
+          kubectl set image deployment/iris-api api=$env:IMAGE --record
           kubectl rollout status deployment/iris-api --timeout=180s
 
       - name: Show running image (debug)
-        shell: pwsh
+        shell: powershell
         run: |
-          kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"; echo
+          kubectl get deployment iris-api -o jsonpath="{.spec.template.spec.containers[0].image}"
+          echo ""
